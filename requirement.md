@@ -6,9 +6,19 @@
     - because no struct was mentioned yet
 - tree doc indentation follows the natural indentation of markdown bullet points
 - the lines without "{ ... }" should not be parsed as a node
+  - they are treated as leaf content and skipped during parsing
+    - but hard error when the descendants trailed with "{ ... }" again
 - use "winnow" for text parsing
 - use "facet" for runtime reflection on the Rust struct structures
+- use "assert2" when possible
+- ignore rustfmt for all tests 
 - use the "example_doc.md" as test on a Rust struct structure starting from `OkRoot` in "lib.rs"
 - Rust struct structure:
-  - each node is either a `struct` or an `Vec`
-  - a tree like structure composed of `struct`s and `Vec`s
+  - each node is either a `struct`, `Vec` (array), or `HashMap` (map)
+  - a tree like structure composed of `struct`s and `Vec`s and `HashMap`s
+- prefer `winnow::Parser` methods than just calling the literal functions
+- parsing steps:
+  1.  parse bullet point items in serial order
+      - each with "-" ident length
+      - tolerate multi-lines
+  1.  reorganize the array of items into a tree according to the "-" ident length

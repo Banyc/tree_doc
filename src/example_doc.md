@@ -1,0 +1,29 @@
+- root                    { type: "struct" }
+  - workspace.toml        { type: "struct", name: "workspace" }
+    - servers:            { type: "map", name: "servers" }
+      - server.a          { type: "struct" }
+        - deploy_path
+  - crates                  { type: "array", name: "crates" }
+    - path/to/crate.a       { type: "struct" }
+      - versions            { type: "array", name: "versions" }
+        - v1
+        - v2
+          - ...
+        - v3
+          - install.nu
+          - uninstall.nu
+          - exe.git_hash
+          - config.toml
+          - unit.service
+      - crate.toml            { type: "struct", name: "meta" }
+        - servers:            { type: "array", name: "servers" }
+          - server.a
+        - default install: nu install.nu
+        - default uninstall: nu uninstall.nu
+        - versions            { type: "map", name: "versions" }
+          - v2                { type: "struct" }
+            - install optional: nu install.nu
+            - uninstall optional: nu uninstall.nu
+            - installed: false
+          - v3
+            - installed: true

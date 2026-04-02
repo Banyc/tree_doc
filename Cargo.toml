@@ -1,0 +1,9 @@
+[package]
+name = "tree_doc"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+winnow = "1"
+facet = "0.44"
+leanward = "0.0.3"

@@ -1,0 +1,14 @@
+- goal: dynamic check if the Rust struct structure conforms with the tree doc
+- "{ type: "struct", name: "workspace" }":
+  - this is a node in the tree doc
+  - for this field, the type is a struct and the field name is "workspace"
+  - exception: the top level node must not have a name
+    - because no struct was mentioned yet
+- tree doc indentation follows the natural indentation of markdown bullet points
+- the lines without "{ ... }" should not be parsed as a node
+- use "winnow" for text parsing
+- use "facet" for runtime reflection on the Rust struct structures
+- use the "example_doc.md" as test on a Rust struct structure starting from `OkRoot` in "lib.rs"
+- Rust struct structure:
+  - each node is either a `struct` or an `Vec`
+  - a tree like structure composed of `struct`s and `Vec`s

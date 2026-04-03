@@ -1,24 +1,31 @@
 - goal: dynamic check if the Rust struct structure conforms with the tree doc
-- "{ type: "struct", name: "workspace" }":
-  - this is a node in the tree doc
-  - for this field, the type is a struct and the field name is "workspace"
-  - exception: the top level node must not have a name
-    - because no struct was mentioned yet
-- tree doc indentation follows the natural indentation of markdown bullet points
-- the lines without "{ ... }" should not be parsed as a node
-  - they are treated as leaf content and skipped during parsing
-    - but hard error when the descendants trailed with "{ ... }" again
-- use "winnow" for text parsing
-- use "facet" for runtime reflection on the Rust struct structures
-- use "assert2" when possible
-- ignore rustfmt for all tests 
-- use the "example_doc.md" as test on a Rust struct structure starting from `OkRoot` in "lib.rs"
+- tree doc format:
+  - "{ type: "struct", name: "workspace" }":
+    - this is a node in the tree doc
+    - for this field, the type is a struct and the field name is "workspace"
+  - tree doc indentation follows the natural indentation of markdown bullet points
+  - the lines without "{ ... }" should not be parsed as a node
+    - they are treated as leaf content and skipped during parsing
+      - but hard error when the descendants trailed with "{ ... }" again
+  - leaf content acts as a barrier: metadata blocks at deeper indentation than the last leaf are a hard error
 - Rust struct structure:
   - each node is either a `struct`, `Vec` (array), or `HashMap` (map)
   - a tree like structure composed of `struct`s and `Vec`s and `HashMap`s
-- prefer `winnow::Parser` methods than just calling the literal functions
-- parsing steps:
-  1.  parse bullet point items in serial order
-      - each with "-" ident length
-      - tolerate multi-lines
-  1.  reorganize the array of items into a tree according to the "-" ident length
+  - array nodes merge all struct children into a single Struct inside the Array's child
+  - node kind is determined by the `kind_special` variant, never by `.info`
+  - every direct child of array or map must neither be array nor map
+- libraries:
+  - use "winnow" for text parsing
+  - use "facet" for runtime reflection on the Rust struct structures
+  - use "assert2" when possible
+  - use "bon" for named arguments on functions with many params
+- testing:
+  - ignore rustfmt for all tests
+  - use the "example.td" as test on a Rust struct structure starting from `OkRoot` in "lib.rs"
+- code style:
+  - prefer `winnow::Parser` methods than just calling the literal functions
+    - e.g.: `parse_xx.parse(input)`; not `parse_xx(input)`
+  - boolean variables must have self-explanatory names
+  - no raw comparisons in conditionals; assign to a named boolean first
+  - save lines of code; use `#[rustfmt::skip]` and one-liners when it reduces vertical space
+  - no unnecessary indentation; restructure code so the purpose is obvious without nesting

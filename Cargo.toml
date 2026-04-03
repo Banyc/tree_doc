@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-winnow = "1"
+assert2 = "0.4"
+bon = "3"
 facet = "0.44"
 facet-reflect = "0.44"
 leanward = "0.0.3"
-assert2 = "0.4.0"
+winnow = "1"

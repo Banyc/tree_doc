@@ -2,7 +2,7 @@
   - workspace.toml        { type: "struct", name: "workspace" }
     - servers:            { type: "map", name: "servers" }
       - server.a          { type: "struct" }
-        - deploy_path
+        - deploy_path     { name: "deploy_path" }
   - crates                  { type: "array", name: "crates" }
     - path/to/crate.a       { type: "struct" }
       - versions            { type: "array", name: "versions" }
@@ -21,9 +21,9 @@
         - default install: nu install.nu
         - default uninstall: nu uninstall.nu
         - versions            { type: "map", name: "versions" }
-          - v2                { type: "struct" }
-            - install optional: nu install.nu
+          - v2                                      { type: "struct" }
+            - install optional: nu install.nu       { name: "install" }
             - uninstall optional: nu uninstall.nu
             - installed: false
-          - v3
-            - installed: true
+          - v3                                      { type: "struct" }
+            - installed: true                       { name: "installed" }

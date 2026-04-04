@@ -13,7 +13,6 @@
   - a tree like structure composed of `struct`s and `Vec`s and `HashMap`s
   - array nodes merge all struct children into a single Struct inside the Array's child
   - node kind is determined by the `kind_special` variant, never by `.info`
-  - every direct child of array or map must neither be array nor map
 - libraries:
   - use "winnow" for text parsing
   - use "facet" for runtime reflection on the Rust struct structures

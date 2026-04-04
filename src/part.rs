@@ -71,10 +71,14 @@ pub struct NodeInfo {
 
 pub type Input<'i> = LocatingSlice<&'i str>;
 
+leanward::nest! {
 pub struct ParsedLine {
     pub indent: usize,
-    pub info: Option<NodeInfo>,
-}
+    pub info: pub enum ItemInfo {
+        Bare,
+        Described(NodeInfo),
+    },
+}}
 
 pub fn parse_line(input: &mut Input<'_>) -> ModalResult<ParsedLine> {
     let start = input.checkpoint();
@@ -88,14 +92,13 @@ pub fn parse_line(input: &mut Input<'_>) -> ModalResult<ParsedLine> {
     let kind_and_name = opt(parse_meta_block).parse_next(input)?;
     let Some((kind, name)) = kind_and_name else {
         input.reset(&start);
-        return Ok(ParsedLine { indent, info: None });
+        let info = ItemInfo::Bare;
+        return Ok(ParsedLine { indent, info });
     };
     space0.parse_next(input)?;
     let info = NodeInfo { name, kind };
-    Ok(ParsedLine {
-        indent,
-        info: Some(info),
-    })
+    let info = ItemInfo::Described(info);
+    Ok(ParsedLine { indent, info })
 }
 #[cfg(test)] #[test] #[rustfmt::skip] fn test_parse_line() { leanward::local! {
     let tc = struct Case<'a> {
@@ -115,9 +118,10 @@ pub fn parse_line(input: &mut Input<'_>) -> ModalResult<ParsedLine> {
     for tc in inputs {
         let mut input = LocatingSlice::new(tc.raw);
         let result = parse_line(&mut input).unwrap();
-        assert2::check!(result.info.is_some() == tc.some, "input: {}", tc.raw);
+        let expected_info = matches!(&result.info, ItemInfo::Described(_));
+        assert2::check!(expected_info == tc.some, "input: {}", tc.raw);
         assert2::check!(result.indent == tc.indent, "input: {}", tc.raw);
-        let Some(p) = result.info else { continue };
+        let ItemInfo::Described(p) = result.info else { continue };
         let expected_name = match tc.name {
             Some(s) => NodeName::AsField(s.to_string()),
             None => NodeName::Anonymous,
@@ -265,23 +269,23 @@ pub fn parse_quoted_string(input: &mut Input<'_>) -> ModalResult<String> {
         tc,
         Case { raw: r#""a"b""#,           exp: "a",   rest: r#"b""#        },
         Case { raw: r#""foo"bar"baz""#,   exp: "foo", rest: r#"bar"baz""#  },
-        Case { raw: r#""  spaces  ""#,    exp: "  spaces  ", rest: ""      },
-        Case { raw: r#""a""#,             exp: "a",   rest: ""             },
+        Case { raw: r#""  spaces  ""#,    exp: "  spaces  ",      rest: "" },
+        Case { raw: r#""a""#,             exp: "a",               rest: "" },
         Case { raw: r#""{ type: ""struct"" }""#, exp: "{ type: ", rest: r#""struct"" }""# },
         Case { raw: r#""colons:here:and:here""#, exp: "colons:here:and:here", rest: "" },
         Case { raw: r#""commas,and,stuff""#, exp: "commas,and,stuff", rest: "" },
-        Case { raw: r#""日本語""#,         exp: "日本語", rest: ""          },
-        Case { raw: r#""\n\t""#,          exp: r#"\n\t"#, rest: ""         },
-        Case { raw: r#""   ""#,           exp: "   ", rest: ""             },
-        Case { raw: r#""{}[]()<>""#,      exp: "{}[]()<>", rest: ""        },
+        Case { raw: r#""日本語""#,         exp: "日本語",           rest: "" },
+        Case { raw: r#""\n\t""#,          exp: r#"\n\t"#,         rest: "" },
+        Case { raw: r#""   ""#,           exp: "   ",             rest: "" },
+        Case { raw: r#""{}[]()<>""#,      exp: "{}[]()<>",        rest: "" },
         Case { raw: r#""a""b""c""#,       exp: "a",   rest: r#""b""c""#    },
         Case { raw: r#""""""""#,          exp: "",    rest: r#""""""#      },
         Case { raw: r#""hello"world"#,    exp: "hello", rest: "world"      },
         Case { raw: r#""\"hello"world"#,  exp: "\"hello", rest: "world"    },
         Case { raw: r#""hello\""world"#,  exp: "hello\"", rest: "world"    },
-        Case { raw: r#""""#,             exp: "",    rest: ""             },
-        Case { raw: r#""  ""#,            exp: "  ",  rest: ""             },
-        Case { raw: r#""a b c d e f g""#, exp: "a b c d e f g", rest: ""  },
+        Case { raw: r#""""#,              exp: "",                rest: "" },
+        Case { raw: r#""  ""#,            exp: "  ",              rest: "" },
+        Case { raw: r#""a b c d e f g""#, exp: "a b c d e f g",   rest: "" },
     ];
     for tc in inputs {
         let mut input = LocatingSlice::new(tc.raw);

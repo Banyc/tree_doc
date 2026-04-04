@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use winnow::prelude::*;
 use winnow::stream::{LocatingSlice, Location};
 
-use crate::part::{ComplexKind, Kind, NodeInfo, NodeName, ParsedLine, Span, parse_line};
+use crate::part::{ComplexKind, ItemInfo, Kind, NodeInfo, NodeName, ParsedLine, Span, parse_line};
 
 leanward::nest! {
 #[derive(Debug, Clone, PartialEq)]
@@ -13,9 +13,15 @@ pub struct Node {
     pub kind_special:
         #[derive(Debug, Clone, PartialEq)]
         pub enum NodeKindSpecial {
-            Struct { children: HashMap<String, Option<Node>> },
-            Array { child: Option<Box<Node>> },
-            Map { child: Option<Box<Node>> },
+            Leaf,
+            Complex(
+                #[derive(Debug, Clone, PartialEq)]
+                pub enum NodeComplexKindSpecial {
+                    Struct { children: HashMap<String, Node> },
+                    Array { child_fragments: Vec<Node> },
+                    Map { child_fragments: Vec<Node> },
+                },
+            ),
         },
 }}
 
@@ -50,28 +56,31 @@ pub type Result<T> = core::result::Result<T, Error>;
 pub fn validate<T: Facet<'static>>(tree_doc: &Node) -> Result<()> {
     fn validate_node(node: &Node, shape: &'static facet::Shape) -> Result<()> {
         match &node.kind_special {
-            NodeKindSpecial::Struct { .. } => validate_struct_fields(node, shape),
-            NodeKindSpecial::Array { child } => {
+            NodeKindSpecial::Leaf => Ok(()),
+            NodeKindSpecial::Complex(NodeComplexKindSpecial::Struct { .. }) => {
+                validate_struct_fields(node, shape)
+            }
+            NodeKindSpecial::Complex(NodeComplexKindSpecial::Array { child_fragments }) => {
                 let facet::Def::List(list_def) = shape.def else {
                     return Err(Error::ValidateError {
                         span: node.span,
                         msg: format!("Expected array-like type, got {:?}", shape.def),
                     });
                 };
-                if let Some(child_node) = child {
-                    validate_node(child_node, list_def.t)?;
+                for fragment in child_fragments {
+                    validate_node(fragment, list_def.t)?;
                 }
                 Ok(())
             }
-            NodeKindSpecial::Map { child } => {
+            NodeKindSpecial::Complex(NodeComplexKindSpecial::Map { child_fragments }) => {
                 let facet::Def::Map(map_def) = shape.def else {
                     return Err(Error::ValidateError {
                         span: node.span,
                         msg: format!("Expected map-like type, got {:?}", shape.def),
                     });
                 };
-                if let Some(child_node) = child {
-                    validate_node(child_node, map_def.v)?;
+                for fragment in child_fragments {
+                    validate_node(fragment, map_def.v)?;
                 }
                 Ok(())
             }
@@ -93,7 +102,7 @@ pub fn validate<T: Facet<'static>>(tree_doc: &Node) -> Result<()> {
             struct_type.fields.iter().map(|f| (f.name, f)).collect();
 
         let children = match &node.kind_special {
-            NodeKindSpecial::Struct { children } => children,
+            NodeKindSpecial::Complex(NodeComplexKindSpecial::Struct { children }) => children,
             _ => {
                 return Err(Error::ValidateError {
                     span: node.span,
@@ -102,109 +111,14 @@ pub fn validate<T: Facet<'static>>(tree_doc: &Node) -> Result<()> {
             }
         };
 
-        for (child_name, child_opt) in children {
+        for (child_name, child) in children {
             let field = field_map
                 .get(child_name.as_str())
                 .ok_or(Error::ValidateError {
                     span: node.span,
                     msg: format!("Field '{child_name}' not found in struct"),
                 })?;
-
-            let child_shape = field.shape();
-            let is_complex = matches!(child_shape.def, facet::Def::List(_) | facet::Def::Map(_))
-                || matches!(
-                    child_shape.ty,
-                    facet::Type::User(facet::UserType::Struct(_))
-                );
-
-            let Some(child) = child_opt.as_ref() else {
-                if is_complex {
-                    return Err(Error::ValidateError {
-                        span: node.span,
-                        msg: format!("Child node '{child_name}' missing"),
-                    });
-                }
-                continue;
-            };
-
-            let child_kind = match &child.kind_special {
-                NodeKindSpecial::Struct { .. } => ComplexKind::Struct,
-                NodeKindSpecial::Array { .. } => ComplexKind::Array,
-                NodeKindSpecial::Map { .. } => ComplexKind::Map,
-            };
-
-            match child_kind {
-                ComplexKind::Struct => {
-                    if !is_complex
-                        || !matches!(
-                            child_shape.ty,
-                            facet::Type::User(facet::UserType::Struct(_))
-                        )
-                    {
-                        return Err(Error::ValidateError {
-                            span: child.span,
-                            msg: format!(
-                                "Field '{child_name}' is not a struct in Rust but typed as struct in doc"
-                            ),
-                        });
-                    }
-                    validate_struct_fields(child, child_shape)?;
-                }
-                ComplexKind::Array => {
-                    if !is_complex || !matches!(child_shape.def, facet::Def::List(_)) {
-                        return Err(Error::ValidateError {
-                            span: child.span,
-                            msg: format!(
-                                "Field '{child_name}' is not an array in Rust but typed as array in doc"
-                            ),
-                        });
-                    }
-                    let facet::Def::List(list_def) = child_shape.def else {
-                        unreachable!()
-                    };
-                    if let NodeKindSpecial::Array {
-                        child: ref child_node,
-                    } = child.kind_special
-                        && let Some(child_node) = child_node
-                    {
-                        validate_node(child_node, list_def.t)?;
-                    }
-                }
-                ComplexKind::Map => {
-                    if !is_complex || !matches!(child_shape.def, facet::Def::Map(_)) {
-                        return Err(Error::ValidateError {
-                            span: child.span,
-                            msg: format!(
-                                "Field '{child_name}' is not a map in Rust but typed as map in doc"
-                            ),
-                        });
-                    }
-                    let facet::Def::Map(map_def) = child_shape.def else {
-                        unreachable!()
-                    };
-                    if let NodeKindSpecial::Map {
-                        child: ref child_node,
-                    } = child.kind_special
-                        && let Some(child_node) = child_node
-                    {
-                        validate_node(child_node, map_def.v)?;
-                    }
-                }
-            }
-        }
-
-        for field in struct_type.fields {
-            let is_complex = matches!(field.shape().def, facet::Def::List(_) | facet::Def::Map(_))
-                || matches!(
-                    field.shape().ty,
-                    facet::Type::User(facet::UserType::Struct(_))
-                );
-            if is_complex && !children.contains_key(field.name) {
-                return Err(Error::ValidateError {
-                    span: node.span,
-                    msg: format!("Field '{}' missing from tree", field.name),
-                });
-            }
+            validate_node(child, field.shape())?;
         }
 
         Ok(())
@@ -257,10 +171,12 @@ pub fn parse_raw(input: &str) -> Result<RawNode> {
         })?;
 
         let ParsedLine { indent, info } = parsed;
-        let info_or_is_leaf_line = info;
-        let Some(info) = info_or_is_leaf_line else {
-            last_leaf_indent = Some(indent);
-            continue;
+        let info = match info {
+            ItemInfo::Bare => {
+                last_leaf_indent = Some(indent);
+                continue;
+            }
+            ItemInfo::Described(info) => info,
         };
         #[rustfmt::skip]
         check_disconnected_node().last_leaf_indent(&mut last_leaf_indent).indent(indent).input(input).line_start_offset(line_start_offset).line(line).call()?;
@@ -302,83 +218,57 @@ pub fn parse_raw(input: &str) -> Result<RawNode> {
 }
 
 fn convert_raw(raw: RawNode) -> Result<Node> {
-    #[rustfmt::skip]
     let kind = match raw.info.kind {
-        Kind::Leaf => return { Err(Error::ValidateError {
-            span: raw.span,
-            msg: "Leaf node cannot be converted to structured node".to_string(),
-        })},
+        Kind::Leaf => {
+            if !raw.children.is_empty() {
+                return Err(Error::ValidateError {
+                    span: raw.span,
+                    msg: "Leaf node should not have children".to_string(),
+                });
+            }
+            return {
+                Ok(Node {
+                    span: raw.span,
+                    kind_special: NodeKindSpecial::Leaf,
+                })
+            };
+        }
         Kind::Complex(complex_kind) => complex_kind,
+    };
+    let convert_children = |raw: RawNode| {
+        raw.children
+            .into_iter()
+            .map(convert_raw)
+            .collect::<Result<Vec<Node>>>()
     };
     match kind {
         ComplexKind::Struct => {
-            let fields: HashMap<String, Option<Node>> =
-                collect_struct_fields(raw.children.into_iter())?;
+            let fields: HashMap<String, Node> = collect_struct_fields(raw.children.into_iter())?;
             Ok(Node {
                 span: raw.span,
-                kind_special: NodeKindSpecial::Struct { children: fields },
+                kind_special: NodeKindSpecial::Complex(NodeComplexKindSpecial::Struct {
+                    children: fields,
+                }),
             })
         }
         ComplexKind::Array => {
             let span = raw.span;
-            let child = merge_children(kind, raw)?.map(Box::new);
-            Ok(Node {
-                span,
-                kind_special: NodeKindSpecial::Array { child },
-            })
+            let child_fragments = convert_children(raw)?;
+            let kind_special =
+                NodeKindSpecial::Complex(NodeComplexKindSpecial::Array { child_fragments });
+            Ok(Node { span, kind_special })
         }
         ComplexKind::Map => {
             let span = raw.span;
-            let child = merge_children(kind, raw)?.map(Box::new);
-            Ok(Node {
-                span,
-                kind_special: NodeKindSpecial::Map { child },
-            })
+            let child_fragments = convert_children(raw)?;
+            let kind_special =
+                NodeKindSpecial::Complex(NodeComplexKindSpecial::Map { child_fragments });
+            Ok(Node { span, kind_special })
         }
     }
 }
 
-fn merge_children(kind: ComplexKind, raw: RawNode) -> Result<Option<Node>> {
-    let no_fake_child = raw.children.is_empty();
-    let any_named_child = raw
-        .children
-        .iter()
-        .any(|c| matches!(c.info.name, NodeName::AsField(_)));
-    if any_named_child {
-        return Err(Error::ValidateError {
-            span: raw.span,
-            msg: format!("Under {kind:?} no child should have a name"),
-        });
-    }
-    let is_not_struct = |n: &RawNode| n.info.kind != Kind::Complex(ComplexKind::Struct);
-    let any_not_struct_child = raw.children.iter().any(is_not_struct);
-    if any_not_struct_child {
-        return Err(Error::ValidateError {
-            span: raw.span,
-            msg: format!("Under {kind:?} child must be struct"),
-        });
-    }
-    let grand_children = raw
-        .children
-        .into_iter()
-        .flat_map(|c| c.children.into_iter());
-    let merged_fields: HashMap<String, Option<Node>> = collect_struct_fields(grand_children)?;
-    let node = if no_fake_child {
-        None
-    } else {
-        Some(Node {
-            span: raw.span,
-            kind_special: NodeKindSpecial::Struct {
-                children: merged_fields,
-            },
-        })
-    };
-    Ok(node)
-}
-
-fn collect_struct_fields(
-    fields: impl Iterator<Item = RawNode>,
-) -> Result<HashMap<String, Option<Node>>> {
+fn collect_struct_fields(fields: impl Iterator<Item = RawNode>) -> Result<HashMap<String, Node>> {
     fields
         .map(|mut field| {
             let name = match std::mem::replace(&mut field.info.name, NodeName::Anonymous) {
@@ -390,18 +280,7 @@ fn collect_struct_fields(
                     });
                 }
             };
-            let leaf = field.info.kind == Kind::Leaf;
-            let node = if leaf {
-                if !field.children.is_empty() {
-                    return Err(Error::ValidateError {
-                        span: field.span,
-                        msg: "Untyped node should not have children".into(),
-                    });
-                }
-                None
-            } else {
-                Some(convert_raw(field)?)
-            };
+            let node = convert_raw(field)?;
             Ok((name, node))
         })
         .collect::<Result<_>>()
@@ -440,16 +319,18 @@ fn check_disconnected_node(
   - this is just a comment; ignored
     - a comment as well"#;
     let node = parse(tc).unwrap();
-    let child = match &node.kind_special {
-        NodeKindSpecial::Array { child } => child.as_ref().unwrap(),
-        _ => panic!(),
+    let grand_children = |frag_i: usize| {
+        let child = match &node.kind_special {
+            NodeKindSpecial::Complex(NodeComplexKindSpecial::Array { child_fragments }) => &child_fragments[frag_i],
+            _ => panic!(),
+        };
+        match &child.kind_special {
+            NodeKindSpecial::Complex(NodeComplexKindSpecial::Struct { children }) => children,
+            _ => panic!(),
+        }
     };
-    let grand_children = match &child.kind_special {
-        NodeKindSpecial::Struct { children } => children,
-        _ => panic!(),
-    };
-    assert2::assert!(grand_children.get("a").is_some());
-    assert2::assert!(grand_children.get("b").is_some());
+    assert2::assert!(grand_children(0).get("a").is_some());
+    assert2::assert!(grand_children(1).get("b").is_some());
 }
 
 #[cfg(test)] #[test] #[rustfmt::skip] fn test_parse_bad() {

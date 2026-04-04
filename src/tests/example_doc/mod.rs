@@ -71,25 +71,33 @@ mod tests {
 
         fn is_name_in_tree(node: &Node, name: &str) -> bool {
             match &node.kind_special {
-                crate::NodeKindSpecial::Struct { children } => {
+                crate::tree_doc::NodeKindSpecial::Complex(
+                    crate::tree_doc::NodeComplexKindSpecial::Struct { children },
+                ) => {
                     for (n, c) in children {
                         if n == name {
                             return true;
                         }
-                        if let Some(c) = c
-                            && is_name_in_tree(c, name)
-                        {
+                        if is_name_in_tree(c, name) {
                             return true;
                         }
                     }
                     false
                 }
-                crate::NodeKindSpecial::Array { child } | crate::NodeKindSpecial::Map { child } => {
-                    match child {
-                        Some(child) => is_name_in_tree(child, name),
-                        None => false,
+                crate::tree_doc::NodeKindSpecial::Complex(
+                    crate::tree_doc::NodeComplexKindSpecial::Array { child_fragments },
+                )
+                | crate::tree_doc::NodeKindSpecial::Complex(
+                    crate::tree_doc::NodeComplexKindSpecial::Map { child_fragments },
+                ) => {
+                    for fragment in child_fragments {
+                        if is_name_in_tree(fragment, name) {
+                            return true;
+                        }
                     }
+                    false
                 }
+                crate::tree_doc::NodeKindSpecial::Leaf => false,
             }
         }
         for name in NAMES {
@@ -118,38 +126,37 @@ mod tests {
         workspace:
             #[derive(Debug, Default, facet::Facet)]
             struct Workspace {
-                servers: HashMap<String, WorkspaceServer>,
+                servers: HashMap<String,
+                    #[derive(Debug, Default, facet::Facet)]
+                    struct WorkspaceServer {
+                        deploy_path: String,
+                    }
+                >,
             },
-        crates: Vec<Crate>,
-    }}
-
-    #[derive(Debug, Default, facet::Facet)]
-    struct WorkspaceServer {
-        deploy_path: String,
-    }
-
-    leanward::nest! {
-    #[derive(Debug, Default, facet::Facet)]
-    struct Crate {
-        versions: Vec<VersionStash>,
-        meta:
+        crates: Vec<
             #[derive(Debug, Default, facet::Facet)]
-            struct CrateMeta {
-                servers: Vec<String>,
-                versions: HashMap<String, VersionMeta>,
-            },
+            struct Crate {
+                versions: Vec<
+                    #[derive(Debug, Default, facet::Facet)]
+                    struct VersionStash {
+                        name: String,
+                        path: String,
+                    }
+                >,
+                meta:
+                    #[derive(Debug, Default, facet::Facet)]
+                    struct CrateMeta {
+                        servers: Vec<String>,
+                        versions: HashMap<String,
+                            #[derive(Debug, Default, facet::Facet)]
+                            struct VersionMeta {
+                                random_stuff: String,
+                                install: String,
+                                installed: bool,
+                            }
+                        >,
+                    },
+            }
+        >,
     }}
-
-    #[derive(Debug, Default, facet::Facet)]
-    struct VersionStash {
-        name: String,
-        path: String,
-    }
-
-    #[derive(Debug, Default, facet::Facet)]
-    struct VersionMeta {
-        random_stuff: String,
-        install: String,
-        installed: bool,
-    }
 }

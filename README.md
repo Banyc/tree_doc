@@ -6,7 +6,7 @@ A lightweight doc format for defining and validating nested tree structures — 
 
 ## The Problem
 
-When working with deeply nested structs — config schemas, data models, API response shapes, file system layouts — you typically write them out flat, one field after another. Most languages and editors don't give you a live, hierarchical view of the tree you're building.
+When working with deeply nested structs — config schemas, data models, API response shapes, file system layouts — you typically write them out flat, one type after another. Most languages and editors don't give you a live, hierarchical view of the tree you're building.
 
 This means:
 
@@ -21,14 +21,14 @@ This means:
 
 `tree_doc` lets you write a **human-readable, tree-structured document** that describes your nested structure's intended shape — with types, names, and examples — and then **automatically validates** that your actual implementation matches it.
 
-Think of it as a schema doc that doubles as a live correctness check. No more eyeballing. No more mental stack traces through nested types.
+Think of it as a schema doc that doubles as a live correctness check. No more eyeballing. No more mental stack traces through scattered type definitions.
 
 ---
 
 ## Benefits
 
 - **Visual clarity** — See your entire nested structure as an indented tree, not a flat wall of field definitions
-- **Automated validation** — Catch missing fields, wrong nesting, or structural drift without manual review
+- **Automated validation** — Catch missing fields, misplaced types, or structural drift without manual review
 - **AI-agent-safe** — When LLMs refactor your code, `tree_doc` catches any unintended shape changes before they ship
 - **Design-first workflow** — Draft the doc first, write the implementation to match, then keep them in sync forever
 - **Living documentation** — The doc isn't just for humans; it's a machine-checkable contract for your structure's shape
@@ -39,15 +39,15 @@ Think of it as a schema doc that doubles as a live correctness check. No more ey
 
 The following `tree_doc` describes a deployment workspace configuration:
 
-```
-- root { type: "struct" }
-  - workspace.toml { type: "struct", name: "workspace" }
-    - servers: { type: "map", name: "servers" }
-      - server.a { type: "struct" }
+```td
+- root                    { type: "struct" }
+  - workspace.toml        { type: "struct", name: "workspace" }
+    - servers:            { type: "map", name: "servers" }
+      - server.a          { type: "struct" }
         - deploy_path
-  - crates { type: "array", name: "crates" }
-    - path/to/crate.a { type: "struct" }
-      - versions { type: "array", name: "versions" }
+  - crates                { type: "array", name: "crates" }
+    - path/to/crate.a     { type: "struct" }
+      - versions          { type: "array", name: "versions" }
         - v1
         - v2
           - ...
@@ -57,13 +57,13 @@ The following `tree_doc` describes a deployment workspace configuration:
           - exe.git_hash
           - config.toml
           - unit.service
-      - crate.toml { type: "struct", name: "meta" }
-        - servers: { type: "array", name: "servers" }
+      - crate.toml        { type: "struct", name: "meta" }
+        - servers:        { type: "array", name: "servers" }
           - server.a
         - default install: nu install.nu
         - default uninstall: nu uninstall.nu
-        - versions { type: "map", name: "versions" }
-          - v2 { type: "struct" }
+        - versions        { type: "map", name: "versions" }
+          - v2            { type: "struct" }
             - install optional: nu install.nu
             - uninstall optional: nu uninstall.nu
             - installed: false
@@ -95,15 +95,15 @@ Your data model was correct last month. Since then, several people (and a few AI
 
 ### 3. Working with AI-assisted refactoring
 
-You ask an AI agent to refactor your parsing or serialization code. It helpfully reorganizes some structs. Did it preserve the nested shape you intended?
+You ask an AI agent to refactor your parsing or serialization code. It helpfully reorganizes some structs. Did it preserve the type layout you intended?
 
-**Without `tree_doc`:** Hard to tell without a careful manual review of the full type hierarchy.
+**Without `tree_doc`:** Hard to tell without a careful manual review of the full type definition.
 
 **With `tree_doc`:** The doc is the ground truth. The validator catches any shape changes the agent introduced — whether intentional or accidental — before they reach production.
 
 ### 4. Onboarding into an unfamiliar codebase
 
-You're new to a project with a large, deeply nested domain model. Understanding the full structure means tracing through dozens of type definitions across multiple files.
+You're new to a project with a large domain model. Understanding the full structure means tracing through dozens of type definitions across multiple files.
 
 **Without `tree_doc`:** You spend hours building a mental model by jumping between files, and you're still not sure you got it right.
 

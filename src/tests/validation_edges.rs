@@ -4,20 +4,20 @@ mod tests {
 
     use crate::{parse, validate};
 
-    #[derive(Debug, Default, facet::Facet)]
-    struct RecurseArrayRoot {
-        items: Vec<RecurseArrayItem>,
-    }
-
     leanward::nest! {
     #[derive(Debug, Default, facet::Facet)]
-    struct RecurseArrayItem {
-        name: String,
-        nested:
+    struct RecurseArrayRoot {
+        items: Vec<
             #[derive(Debug, Default, facet::Facet)]
-            struct RecurseArrayNested {
-                value: i32,
-            },
+            struct RecurseArrayItem {
+                name: String,
+                nested:
+                    #[derive(Debug, Default, facet::Facet)]
+                    struct RecurseArrayNested {
+                        value: i32,
+                    },
+            }
+        >,
     }}
 
     #[test]
@@ -34,33 +34,20 @@ mod tests {
         assert!(validate::<RecurseArrayRoot>(&tree).is_ok());
     }
 
-    #[test]
-    fn test_validate_reject_array_child_missing_field() {
-        let src = r#"
-- root { type: "struct" }
-  - items { type: "array", name: "items" }
-    - item.a { type: "struct" }
-      - name { name: "name" }
-"#;
-        let tree = parse(src).unwrap();
-        let result = validate::<RecurseArrayRoot>(&tree);
-        assert!(result.is_err());
-    }
-
-    #[derive(Debug, Default, facet::Facet)]
-    struct RecurseMapRoot {
-        items: HashMap<String, RecurseMapItem>,
-    }
-
     leanward::nest! {
     #[derive(Debug, Default, facet::Facet)]
-    struct RecurseMapItem {
-        name: String,
-        nested:
+    struct RecurseMapRoot {
+        items: HashMap<String,
             #[derive(Debug, Default, facet::Facet)]
-            struct RecurseMapNested {
-                value: i32,
-            },
+            struct RecurseMapItem {
+                name: String,
+                nested:
+                    #[derive(Debug, Default, facet::Facet)]
+                    struct RecurseMapNested {
+                        value: i32,
+                    },
+            }
+        >,
     }}
 
     #[test]
@@ -75,19 +62,6 @@ mod tests {
 "#;
         let tree = parse(src).unwrap();
         assert!(validate::<RecurseMapRoot>(&tree).is_ok());
-    }
-
-    #[test]
-    fn test_validate_reject_map_child_missing_field() {
-        let src = r#"
-- root { type: "struct" }
-  - items { type: "map", name: "items" }
-    - item.a { type: "struct" }
-      - name { name: "name" }
-"#;
-        let tree = parse(src).unwrap();
-        let result = validate::<RecurseMapRoot>(&tree);
-        assert!(result.is_err());
     }
 
     #[derive(Debug, Default, facet::Facet)]

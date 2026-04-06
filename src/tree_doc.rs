@@ -18,7 +18,7 @@ pub struct Node {
                 #[derive(Debug, Clone, PartialEq)]
                 pub enum NodeComplexKindSpecial {
                     Struct { children: HashMap<String, Node> },
-                    Array { child_fragments: Vec<Node> },
+                    List { child_fragments: Vec<Node> },
                     Map { child_fragments: Vec<Node> },
                 },
             ),
@@ -60,11 +60,11 @@ pub fn validate<T: Facet<'static>>(tree_doc: &Node) -> Result<()> {
             NodeKindSpecial::Complex(NodeComplexKindSpecial::Struct { .. }) => {
                 validate_struct_fields(node, shape)
             }
-            NodeKindSpecial::Complex(NodeComplexKindSpecial::Array { child_fragments }) => {
+            NodeKindSpecial::Complex(NodeComplexKindSpecial::List { child_fragments }) => {
                 let facet::Def::List(list_def) = shape.def else {
                     return Err(Error::ValidateError {
                         span: node.span,
-                        msg: format!("Expected array-like type, got {:?}", shape.def),
+                        msg: format!("Expected list-like type, got {:?}", shape.def),
                     });
                 };
                 for fragment in child_fragments {
@@ -251,11 +251,11 @@ fn convert_raw(raw: RawNode) -> Result<Node> {
                 }),
             })
         }
-        ComplexKind::Array => {
+        ComplexKind::List => {
             let span = raw.span;
             let child_fragments = convert_children(raw)?;
             let kind_special =
-                NodeKindSpecial::Complex(NodeComplexKindSpecial::Array { child_fragments });
+                NodeKindSpecial::Complex(NodeComplexKindSpecial::List { child_fragments });
             Ok(Node { span, kind_special })
         }
         ComplexKind::Map => {
@@ -311,7 +311,7 @@ fn check_disconnected_node(
 
 #[cfg(test)] #[test] #[rustfmt::skip] fn test_parse_merge() {
     let tc = r#"
-- list { type: "array" }
+- list { type: "list" }
   - a { type: "struct" }
     - a { name: "a" }
   - b { type: "struct" }
@@ -321,7 +321,7 @@ fn check_disconnected_node(
     let node = parse(tc).unwrap();
     let grand_children = |frag_i: usize| {
         let child = match &node.kind_special {
-            NodeKindSpecial::Complex(NodeComplexKindSpecial::Array { child_fragments }) => &child_fragments[frag_i],
+            NodeKindSpecial::Complex(NodeComplexKindSpecial::List { child_fragments }) => &child_fragments[frag_i],
             _ => panic!(),
         };
         match &child.kind_special {

@@ -9,9 +9,9 @@
       - but hard error when the descendants trailed with "{ ... }" again
   - leaf content acts as a barrier: metadata blocks at deeper indentation than the last leaf are a hard error
 - Rust struct structure:
-  - each node is either a `struct`, `Vec` (array), or `HashMap` (map)
+  - each node is either a `struct`, `Vec` (list), or `HashMap` (map)
   - a tree like structure composed of `struct`s and `Vec`s and `HashMap`s
-  - array nodes merge all struct children into a single Struct inside the Array's child
+  - list nodes merge all struct children into a single Struct inside the List's child
   - node kind is determined by the `kind_special` variant, never by `.info`
 - libraries:
   - use "winnow" for text parsing

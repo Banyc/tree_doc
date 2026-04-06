@@ -6,14 +6,14 @@ mod tests {
 
     leanward::nest! {
     #[derive(Debug, Default, facet::Facet)]
-    struct RecurseArrayRoot {
+    struct RecurseListRoot {
         items: Vec<
             #[derive(Debug, Default, facet::Facet)]
-            struct RecurseArrayItem {
+            struct RecurseListItem {
                 name: String,
                 nested:
                     #[derive(Debug, Default, facet::Facet)]
-                    struct RecurseArrayNested {
+                    struct RecurseListNested {
                         value: i32,
                     },
             }
@@ -21,17 +21,17 @@ mod tests {
     }}
 
     #[test]
-    fn test_validate_recurse_into_array_children() {
+    fn test_validate_recurse_into_list_children() {
         let src = r#"
 - root { type: "struct" }
-  - items { type: "array", name: "items" }
+  - items { type: "list", name: "items" }
     - item.a { type: "struct" }
       - name { name: "name" }
       - nested { type: "struct", name: "nested" }
         - value { name: "value" }
 "#;
         let tree = parse(src).unwrap();
-        assert!(validate::<RecurseArrayRoot>(&tree).is_ok());
+        assert!(validate::<RecurseListRoot>(&tree).is_ok());
     }
 
     leanward::nest! {
@@ -79,7 +79,7 @@ mod tests {
 "#,
             r#"
 - root { type: "struct" }
-  - name { type: "array", name: "name" }
+  - name { type: "list", name: "name" }
 "#,
             r#"
 - root { type: "struct" }

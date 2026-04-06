@@ -62,7 +62,7 @@ pub struct NodeInfo {
                 #[derive(Debug, Clone, Copy, PartialEq)]
                 pub enum ComplexKind {
                     Struct,
-                    Array,
+                    List,
                     Map,
                 }
             ),
@@ -111,7 +111,7 @@ pub fn parse_line(input: &mut Input<'_>) -> ModalResult<ParsedLine> {
     let inputs = [
         tc,
         Case { raw: r#"- root { type: "struct" }"#,                  some: true,  indent: 0, name: None,          kind: Kind::Complex(ComplexKind::Struct) },
-        Case { raw: r#"  - child { type: "array", name: "items" }"#, some: true,  indent: 2, name: Some("items"), kind: Kind::Complex(ComplexKind::Array) },
+        Case { raw: r#"  - child { type: "list", name: "items" }"#, some: true,  indent: 2, name: Some("items"), kind: Kind::Complex(ComplexKind::List) },
         Case { raw: r#"- host"#,                                     some: false, indent: 0, name: None,          kind: Kind::Leaf },
         Case { raw: r#"- root{} { type: "struct" }"#,                some: true,  indent: 0, name: None,          kind: Kind::Complex(ComplexKind::Struct) },
     ];
@@ -139,7 +139,7 @@ pub fn parse_meta_block(input: &mut Input<'_>) -> ModalResult<(Kind, NodeName)> 
         .find(|(k, _)| k == "type")
         .map(|(_, v)| v.as_str())
     {
-        Some("array") => Kind::Complex(ComplexKind::Array),
+        Some("list") => Kind::Complex(ComplexKind::List),
         Some("map") => Kind::Complex(ComplexKind::Map),
         Some("struct") => Kind::Complex(ComplexKind::Struct),
         None => Kind::Leaf,
@@ -161,15 +161,15 @@ pub fn parse_meta_block(input: &mut Input<'_>) -> ModalResult<(Kind, NodeName)> 
 }
 #[cfg(test)] #[test] #[rustfmt::skip] fn test_parse_meta_block() { leanward::local! {
     let tc = struct Case<'a> {
-        raw:      &'a str          = r#"{ type: "array", name: "crates" }"#,
-        kind:     Kind             = Kind::Complex(ComplexKind::Array),
+        raw:      &'a str          = r#"{ type: "list", name: "crates" }"#,
+        kind:     Kind             = Kind::Complex(ComplexKind::List),
         name:     Option<&'a str>  = Some("crates"),
     };}
     let inputs = [
         tc,
         Case { raw: r#"{ type: "map", name: "servers" }"#, kind: Kind::Complex(ComplexKind::Map),    name: Some("servers") },
         Case { raw: r#"{ type: "struct" }"#,               kind: Kind::Complex(ComplexKind::Struct), name: None },
-        Case { raw: r#"{ name: "foo", type: "array" }"#,   kind: Kind::Complex(ComplexKind::Array),  name: Some("foo") },
+        Case { raw: r#"{ name: "foo", type: "list" }"#,   kind: Kind::Complex(ComplexKind::List),  name: Some("foo") },
         Case { raw: r#"{ name: "foo" }"#,                  kind: Kind::Leaf,                          name: Some("foo") },
     ];
     for tc in inputs {
@@ -200,7 +200,7 @@ pub fn parse_kv_pair(input: &mut Input<'_>) -> ModalResult<(String, String)> {
     let inputs = [
         tc,
         Case { raw: r#"name: "servers""#,   key: "name", val: "servers" },
-        Case { raw: r#"  type: "array"  "#, key: "type", val: "array" },
+        Case { raw: r#"  type: "list"  "#, key: "type", val: "list" },
     ];
     for tc in inputs {
         let mut input = LocatingSlice::new(tc.raw);

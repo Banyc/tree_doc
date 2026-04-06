@@ -45,9 +45,9 @@ The following `tree_doc` describes a deployment workspace configuration:
     - servers:            { type: "map", name: "servers" }
       - server.a          { type: "struct" }
         - deploy_path
-  - crates                { type: "array", name: "crates" }
+  - crates                { type: "list", name: "crates" }
     - path/to/crate.a     { type: "struct" }
-      - versions          { type: "array", name: "versions" }
+      - versions          { type: "list", name: "versions" }
         - v1
         - v2
           - ...
@@ -58,7 +58,7 @@ The following `tree_doc` describes a deployment workspace configuration:
           - config.toml
           - unit.service
       - crate.toml        { type: "struct", name: "meta" }
-        - servers:        { type: "array", name: "servers" }
+        - servers:        { type: "list", name: "servers" }
           - server.a
         - default install: nu install.nu
         - default uninstall: nu uninstall.nu
@@ -79,7 +79,7 @@ At a glance, you can see the full tree — every level, every field, every type 
 
 ### 1. Designing a complex nested config
 
-You need to define a deeply nested configuration — a deployment manifest, a game settings schema, a compiler options file. The structure has maps, arrays, and optional fields at multiple levels.
+You need to define a deeply nested configuration — a deployment manifest, a game settings schema, a compiler options file. The structure has maps, lists, and optional fields at multiple levels.
 
 **Without `tree_doc`:** You write the structs incrementally, lose track of nesting levels, and only discover missing fields when something breaks at runtime.
 
